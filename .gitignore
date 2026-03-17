@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Runtime config (contains secrets)
+timbot-gateway.yaml
+timbot-gateway.local.yaml
+
+# Packages
+*.tgz
+
+# IDE & OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Claude / CodeBuddy
+.claude/
+.codebuddy/

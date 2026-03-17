@@ -1,0 +1,24 @@
+# Source code (dist/ is included via package.json "files")
+src/
+test/
+*.ts
+tsconfig.json
+
+# Config files with secrets
+timbot-gateway.yaml
+timbot-gateway.local.yaml
+
+# Dev & CI
+.github/
+.gitignore
+.DS_Store
+.vscode/
+.idea/
+.claude/
+.codebuddy/
+
+# Docs (keep README & LICENSE via npm defaults)
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+CHANGELOG.md
+PUBLISH.md

@@ -1,0 +1,41 @@
+# timbot-gateway 配置文件
+# 复制此文件为 timbot-gateway.yaml 并修改配置
+
+# 网关服务器配置
+server:
+  port: 8080
+  host: "0.0.0.0"
+
+# 被代理的 IM 应用配置
+imApp:
+  sdkAppId: "1600130023"                  # 被代理 IM 应用的 sdkAppId
+  callbackToken: "my_token"               # 回调签名 token，默认 my_token
+  secretKey: "your-real-secret-key"       # IM 应用 SecretKey，用于生成 UserSig
+  appAdmin: "administrator"              # 发 REST API 时使用的 identifier / From_Account
+  botManager: "timbot_king"              # 允许执行内置命令的账号
+  # apiDomain: "console.tim.qq.com"      # 可选，腾讯 IM API 域名，默认 console.tim.qq.com
+
+# 路由配置
+# 每条路由映射一个 timbot userId 到对应的后端 OpenClaw 节点
+routes:
+  - timbotUserId: "bot_a"
+    backend: "http://10.0.1.10:3000"
+    webhookPath: "/timbot"               # 可选，默认 /timbot
+    enabled: true                          # 可选，默认 true
+    description: "生产环境 Bot A"          # 可选，备注用
+
+  - timbotUserId: "bot_b"
+    backend: "http://10.0.1.11:3000"
+    webhookPath: "/timbot"
+    enabled: true
+    description: "生产环境 Bot B"
+
+# 健康检查配置
+healthCheck:
+  enabled: true
+  intervalMs: 30000                        # 健康检查间隔（毫秒）
+  timeoutMs: 5000                          # 健康检查超时（毫秒）
+
+# 日志配置
+logging:
+  level: "info"                           # debug | info | warn | error

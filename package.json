@@ -1,0 +1,52 @@
+{
+  "name": "timbot-gateway",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Lightweight HTTP gateway proxy for timbot — Tencent Cloud IM webhook routing, admin commands & health checks",
+  "author": "longyuqi@tencent.com",
+  "license": "MIT",
+  "homepage": "https://github.com/Henry-li-oc/timbot-gateway#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Henry-li-oc/timbot-gateway.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Henry-li-oc/timbot-gateway/issues"
+  },
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "bin": {
+    "timbot-gateway": "./dist/src/index.js"
+  },
+  "files": [
+    "dist",
+    "timbot-gateway.example.yaml"
+  ],
+  "keywords": [
+    "timbot",
+    "timbot-gateway",
+    "tencent-im",
+    "webhook",
+    "gateway",
+    "proxy",
+    "chatbot",
+    "openclaw",
+    "im-bot",
+    "routing"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsc && mkdir -p dist/src/debug && cp src/debug/GenerateTestUserSig-es.js src/debug/lib-generate-test-usersig-es.min.js dist/src/debug/",
+    "start": "node dist/src/index.js",
+    "test": "pnpm build && node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "yaml": "^2.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
