@@ -69,12 +69,12 @@ describe("Server routing helpers", () => {
     assert.equal(decision.dropReason, undefined);
   });
 
-  it("should resolve group route only when target bot is explicitly mentioned", () => {
+  it("should resolve group route only when target bot is in AtRobots_Account", () => {
     const decision = resolveRouteForWebhook({
       CallbackCommand: "Bot.OnGroupMessage",
       From_Account: "zhiheng",
-      To_Account: "bot",
       GroupId: "group-a",
+      AtRobots_Account: ["@bot"],
       MsgBody: [{ MsgType: "TIMTextElem", MsgContent: { Text: "@bot 帮我看一下" } }],
     });
 
@@ -82,39 +82,88 @@ describe("Server routing helpers", () => {
     assert.equal(decision.dropReason, undefined);
   });
 
-  it("should drop group message without target mention", () => {
+  it("should drop group message without AtRobots_Account", () => {
     const decision = resolveRouteForWebhook({
       CallbackCommand: "Bot.OnGroupMessage",
       From_Account: "zhiheng",
-      To_Account: "bot",
       GroupId: "group-a",
       MsgBody: [{ MsgType: "TIMTextElem", MsgContent: { Text: "大家好" } }],
     });
 
     assert.equal(decision.route, undefined);
-    assert.match(decision.dropReason, /did not mention target bot/);
+    assert.match(decision.dropReason, /missing AtRobots_Account/);
   });
 
-  it("should drop @all group message", () => {
+  it("should drop group message when AtRobots have no matching route", () => {
     const decision = resolveRouteForWebhook({
       CallbackCommand: "Bot.OnGroupMessage",
       From_Account: "zhiheng",
-      To_Account: "bot",
       GroupId: "group-a",
-      MsgBody: [{ MsgType: "TIMTextElem", MsgContent: { Text: "@all 帮忙处理一下" } }],
+      AtRobots_Account: ["@RBT#unknown_bot"],
+      MsgBody: [{ MsgType: "TIMTextElem", MsgContent: { Text: "@unknown_bot hello" } }],
     });
 
     assert.equal(decision.route, undefined);
-    assert.equal(decision.dropReason, "@all is not supported");
+    assert.match(decision.dropReason, /no matching route for AtRobots/);
   });
 
-  it("should route non-message callback by To_Account", () => {
+  it("should drop unsupported CallbackCommand", () => {
     const decision = resolveRouteForWebhook({
       CallbackCommand: "State.StateChange",
       From_Account: "system",
       To_Account: "bot",
     });
 
+    assert.equal(decision.route, undefined);
+    assert.match(decision.dropReason, /unsupported CallbackCommand/);
+  });
+
+  it("should resolve C2C route via C2C.CallbackAfterSendMsg", () => {
+    const decision = resolveRouteForWebhook({
+      CallbackCommand: "C2C.CallbackAfterSendMsg",
+      From_Account: "zhiheng",
+      To_Account: "@bot",
+      MsgBody: [{ MsgType: "TIMTextElem", MsgContent: { Text: "hi" } }],
+    });
+
     assert.equal(decision.route?.timbotUserId, "bot");
+    assert.equal(decision.dropReason, undefined);
+  });
+
+  it("should match first routed bot when multiple bots are @mentioned", () => {
+    const decision = resolveRouteForWebhook({
+      CallbackCommand: "Bot.OnGroupMessage",
+      From_Account: "zhiheng",
+      GroupId: "group-b",
+      AtRobots_Account: ["@unknown_robot", "@helper_bot", "@bot"],
+      MsgBody: [{ MsgType: "TIMTextElem", MsgContent: { Text: "@unknown_robot @helper_bot @bot" } }],
+    });
+
+    // 第一个匹配到路由的是 helper_bot
+    assert.equal(decision.route?.timbotUserId, "helper_bot");
+    assert.equal(decision.dropReason, undefined);
+  });
+
+  it("should drop group message with empty AtRobots_Account array", () => {
+    const decision = resolveRouteForWebhook({
+      CallbackCommand: "Bot.OnGroupMessage",
+      From_Account: "zhiheng",
+      GroupId: "group-a",
+      AtRobots_Account: [],
+      MsgBody: [{ MsgType: "TIMTextElem", MsgContent: { Text: "hello" } }],
+    });
+
+    assert.equal(decision.route, undefined);
+    assert.match(decision.dropReason, /missing AtRobots_Account/);
+  });
+
+  it("should drop C2C message with missing To_Account", () => {
+    const decision = resolveRouteForWebhook({
+      CallbackCommand: "Bot.OnC2CMessage",
+      From_Account: "zhiheng",
+    });
+
+    assert.equal(decision.route, undefined);
+    assert.match(decision.dropReason, /missing To_Account/);
   });
 });

@@ -24,14 +24,6 @@ import { handleAdminMessage } from "./admin.js";
 import { getHealthStatuses } from "./health.js";
 import { logInfo, logDebug, logWarn, logError } from "./logger.js";
 
-function extractText(msg: WebhookMessage): string {
-  if (!Array.isArray(msg.MsgBody)) return "";
-  return msg.MsgBody
-    .filter((item) => item.MsgType === "TIMTextElem" && item.MsgContent?.Text)
-    .map((item) => String(item.MsgContent.Text))
-    .join("")
-    .trim();
-}
 
 export function extractMentionedTimbotUserIds(text: string): string[] {
   const mentions = new Set<string>();
@@ -43,9 +35,6 @@ export function extractMentionedTimbotUserIds(text: string): string[] {
   return [...mentions];
 }
 
-function containsAtAll(text: string): boolean {
-  return /(^|\s)[@＠]all(\s|$)/i.test(text.trim());
-}
 
 function isC2CMessage(msg: WebhookMessage): boolean {
   return msg.CallbackCommand === "Bot.OnC2CMessage" || msg.CallbackCommand === "C2C.CallbackAfterSendMsg";
@@ -55,9 +44,6 @@ function isGroupMessage(msg: WebhookMessage): boolean {
   return msg.CallbackCommand === "Bot.OnGroupMessage";
 }
 
-function isMessageCallback(msg: WebhookMessage): boolean {
-  return isC2CMessage(msg) || isGroupMessage(msg);
-}
 
 function buildExpectedSignature(token: string, requestTime: string): string {
   return createHash("sha256").update(`${token}${requestTime}`).digest("hex");
@@ -103,37 +89,43 @@ function isAdminConversation(msg: WebhookMessage): boolean {
 }
 
 export function resolveRouteForWebhook(msg: WebhookMessage): { route?: RouteEntry; dropReason?: string } {
-  const toAccount = normalizeAccountId(msg.To_Account);
-  if (!toAccount) {
-    return { dropReason: "missing To_Account" };
-  }
-
-  const route = findRouteByTimbotUserId(toAccount);
-  if (!route) {
-    return { dropReason: `unknown To_Account: ${msg.To_Account}` };
-  }
-
+  // 单聊消息：通过 To_Account 匹配路由
   if (isC2CMessage(msg)) {
+    const toAccount = normalizeAccountId(msg.To_Account);
+    if (!toAccount) {
+      return { dropReason: "missing To_Account" };
+    }
+
+    const route = findRouteByTimbotUserId(toAccount);
+    if (!route) {
+      return { dropReason: `unknown To_Account: ${msg.To_Account}` };
+    }
+
     return { route };
   }
 
+  // 群消息：通过 AtRobots_Account 匹配路由
   if (isGroupMessage(msg)) {
-    const text = extractText(msg);
-    if (!text) {
-      return { dropReason: "empty group text" };
+    const atRobots = msg.AtRobots_Account;
+    if (!Array.isArray(atRobots) || atRobots.length === 0) {
+      return { dropReason: "missing AtRobots_Account" };
     }
 
-    if (containsAtAll(text)) {
-      return { dropReason: "@all is not supported" };
+    // 逐个匹配被@的机器人，找到第一个有路由的
+    for (const robotAccount of atRobots) {
+      const normalized = normalizeAccountId(robotAccount);
+      if (!normalized) continue;
+
+      const route = findRouteByTimbotUserId(normalized);
+      if (route) {
+        return { route };
+      }
     }
 
-    const mentions = extractMentionedTimbotUserIds(text);
-    if (!mentions.includes(toAccount)) {
-      return { dropReason: `group message did not mention target bot ${msg.To_Account}` };
-    }
+    return { dropReason: `no matching route for AtRobots: ${atRobots.join(", ")}` };
   }
 
-  return { route };
+  return { dropReason: `unsupported CallbackCommand: ${msg.CallbackCommand}` };
 }
 
 /**
@@ -254,19 +246,27 @@ async function handleWebhook(
   const queryString = urlObj.search ? urlObj.search.substring(1) : "";
   const targetUrl = buildTargetUrl(decision.route, queryString);
 
+  const target = msgObj.To_Account
+    ? `To=${msgObj.To_Account}`
+    : `AtRobots=${(msgObj.AtRobots_Account || []).join(",")} Group=${msgObj.GroupId || "?"}`;
+
   logInfo(
-    `Forwarding: SdkAppid=${sdkAppId} To=${msgObj.To_Account || "?"} From=${msgObj.From_Account || "?"} → ${decision.route.backend}`
+    `Forwarding: SdkAppid=${sdkAppId} ${target} From=${msgObj.From_Account || "?"} → ${decision.route.backend}`
   );
 
   // 立即给 IM 回 200 OK，避免后端慢或异常时 IM 重试导致重复消息
   sendOk(res);
 
   // 异步转发到后端，错误仅记录日志
-  forwardRequest(targetUrl, body, req.headers).then((result) => {
-    if (result.statusCode >= 400) {
-      logWarn(`Backend returned ${result.statusCode} for ${targetUrl}`);
-    }
-  });
+  forwardRequest(targetUrl, body, req.headers)
+    .then((result) => {
+      if (result.statusCode >= 400) {
+        logWarn(`Backend returned ${result.statusCode} for ${targetUrl}`);
+      }
+    })
+    .catch((err) => {
+      logError(`Unexpected forward error: ${err.message}`);
+    });
 }
 
 /**

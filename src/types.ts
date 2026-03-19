@@ -111,8 +111,8 @@ export interface ProxyResult {
 /** Webhook 回调消息体 */
 export interface WebhookMessage {
   CallbackCommand: string;
-  From_Account: string;
-  To_Account: string;
+  From_Account?: string;
+  To_Account?: string;
   MsgBody?: MsgBodyItem[];
   MsgSeq?: number;
   MsgRandom?: number;
@@ -121,6 +121,8 @@ export interface WebhookMessage {
   /** 群消息特有字段 */
   GroupId?: string;
   GroupName?: string;
+  /** 群消息中被 @ 的机器人账号列表（Bot.OnGroupMessage 特有） */
+  AtRobots_Account?: string[];
   [key: string]: unknown;
 }
 
