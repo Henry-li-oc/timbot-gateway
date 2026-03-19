@@ -48,7 +48,7 @@ function containsAtAll(text: string): boolean {
 }
 
 function isC2CMessage(msg: WebhookMessage): boolean {
-  return msg.CallbackCommand === "Bot.OnC2CMessage" || msg.CallbackCommand === "Bot.OnC2cMessage";
+  return msg.CallbackCommand === "Bot.OnC2CMessage" || msg.CallbackCommand === "CallbackAfterSendMsg";
 }
 
 function isGroupMessage(msg: WebhookMessage): boolean {
