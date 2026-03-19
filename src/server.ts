@@ -257,10 +257,16 @@ async function handleWebhook(
   logInfo(
     `Forwarding: SdkAppid=${sdkAppId} To=${msgObj.To_Account || "?"} From=${msgObj.From_Account || "?"} → ${decision.route.backend}`
   );
-  const result = await forwardRequest(targetUrl, body, req.headers);
 
-  res.writeHead(result.statusCode, result.headers as any);
-  res.end(result.body);
+  // 立即给 IM 回 200 OK，避免后端慢或异常时 IM 重试导致重复消息
+  sendOk(res);
+
+  // 异步转发到后端，错误仅记录日志
+  forwardRequest(targetUrl, body, req.headers).then((result) => {
+    if (result.statusCode >= 400) {
+      logWarn(`Backend returned ${result.statusCode} for ${targetUrl}`);
+    }
+  });
 }
 
 /**

@@ -9,7 +9,7 @@
 
 import type { IncomingHttpHeaders } from "node:http";
 import type { ProxyResult } from "./types.js";
-import { logDebug, logError } from "./logger.js";
+import { logDebug, logInfo, logError } from "./logger.js";
 
 /** 转发超时（毫秒） */
 const PROXY_TIMEOUT_MS = 30_000;
@@ -97,7 +97,7 @@ export async function forwardRequest(
       responseHeaders[key] = value;
     });
 
-    logDebug(`Backend responded: ${response.status} (${responseBody.length} bytes)`);
+    logInfo(`Backend responded: ${response.status} (${responseBody.length} bytes)`);
 
     return {
       statusCode: response.status,

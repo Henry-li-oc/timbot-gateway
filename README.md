@@ -23,6 +23,19 @@ pnpm install
 pnpm build
 ```
 
+### 前置条件：开启 IM 回调
+
+在 [腾讯云 IM 控制台](https://console.cloud.tencent.com/im) 中，进入**回调配置**，确保已开启以下回调：
+
+| 回调 | 说明 |
+|------|------|
+| `C2C.CallbackAfterSendMsg` | **单聊消息后回调**（必须开启） |
+| `Bot.OnGroupMessage` | 群聊消息回调（如需群聊路由） |
+
+> ⚠️ 网关同时兼容 `Bot.OnC2CMessage` 和 `C2C.CallbackAfterSendMsg` 作为单聊消息回调，但推荐使用 `C2C.CallbackAfterSendMsg`。
+
+回调 URL 填写网关地址，例如：`https://your-domain.com/timbot`
+
 ### 配置
 
 ```bash
@@ -50,6 +63,9 @@ routes:
     enabled: true
     description: "生产环境 Bot A"
 ```
+
+> ⚠️ **注意**：`backend` 只需填写到 `host:port`，不要包含路径。网关会自动拼接 `webhookPath`（默认 `/timbot`）。
+> 例如：填 `http://10.0.1.10:3000` 而不是 `http://10.0.1.10:3000/timbot`。
 
 ### 启动
 
@@ -79,7 +95,7 @@ node dist/src/index.js --config /path/to/timbot-gateway.yaml
 
 只有满足以下条件的单聊消息，才会触发内置命令：
 
-- `CallbackCommand == Bot.OnC2CMessage`
+- `CallbackCommand` 为 `Bot.OnC2CMessage` 或 `C2C.CallbackAfterSendMsg`
 - `From_Account == imApp.botManager`
 - `To_Account == imApp.appAdmin`
 - 文本以 `/` 开头，且命中内置命令
@@ -129,7 +145,7 @@ curl http://localhost:8080/gateway/status
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `timbotUserId` | string | - | timbot 的 IM userId / `To_Account`（必填） |
-| `backend` | string | - | 后端节点地址（必填） |
+| `backend` | string | - | 后端节点地址，只填 `host:port`，不含路径（必填） |
 | `webhookPath` | string | `/timbot` | Webhook 路径 |
 | `enabled` | boolean | `true` | 是否启用 |
 | `description` | string | - | 备注说明 |
