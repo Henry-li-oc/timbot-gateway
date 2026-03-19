@@ -47,8 +47,16 @@ function containsAtAll(text: string): boolean {
   return /(^|\s)[@＠]all(\s|$)/i.test(text.trim());
 }
 
+function isC2CMessage(msg: WebhookMessage): boolean {
+  return msg.CallbackCommand === "Bot.OnC2CMessage" || msg.CallbackCommand === "Bot.OnC2cMessage";
+}
+
+function isGroupMessage(msg: WebhookMessage): boolean {
+  return msg.CallbackCommand === "Bot.OnGroupMessage";
+}
+
 function isMessageCallback(msg: WebhookMessage): boolean {
-  return msg.CallbackCommand === "Bot.OnC2CMessage" || msg.CallbackCommand === "Bot.OnGroupMessage";
+  return isC2CMessage(msg) || isGroupMessage(msg);
 }
 
 function buildExpectedSignature(token: string, requestTime: string): string {
@@ -89,7 +97,7 @@ function isAdminConversation(msg: WebhookMessage): boolean {
   if (!imAppConfig) return false;
 
   return (
-    msg.CallbackCommand === "Bot.OnC2CMessage" &&
+    isC2CMessage(msg) &&
     normalizeAccountId(msg.To_Account) === normalizeAccountId(imAppConfig.appAdmin)
   );
 }
@@ -105,11 +113,11 @@ export function resolveRouteForWebhook(msg: WebhookMessage): { route?: RouteEntr
     return { dropReason: `unknown To_Account: ${msg.To_Account}` };
   }
 
-  if (msg.CallbackCommand === "Bot.OnC2CMessage") {
+  if (isC2CMessage(msg)) {
     return { route };
   }
 
-  if (msg.CallbackCommand === "Bot.OnGroupMessage") {
+  if (isGroupMessage(msg)) {
     const text = extractText(msg);
     if (!text) {
       return { dropReason: "empty group text" };
