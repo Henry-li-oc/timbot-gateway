@@ -72,7 +72,7 @@ export async function handleAdminMessage(msg: WebhookMessage): Promise<boolean> 
     return false;
   }
 
-  if (msg.CallbackCommand !== "Bot.OnC2CMessage" && msg.CallbackCommand !== "CallbackAfterSendMsg") {
+  if (msg.CallbackCommand !== "Bot.OnC2CMessage" && msg.CallbackCommand !== "C2C.CallbackAfterSendMsg") {
     return false;
   }
 
