@@ -88,44 +88,53 @@ function isAdminConversation(msg: WebhookMessage): boolean {
   );
 }
 
-export function resolveRouteForWebhook(msg: WebhookMessage): { route?: RouteEntry; dropReason?: string } {
+export interface RouteDecision {
+  routes: RouteEntry[];
+  dropReason?: string;
+}
+
+export function resolveRouteForWebhook(msg: WebhookMessage): RouteDecision {
   // 单聊消息：通过 To_Account 匹配路由
   if (isC2CMessage(msg)) {
     const toAccount = normalizeAccountId(msg.To_Account);
     if (!toAccount) {
-      return { dropReason: "missing To_Account" };
+      return { routes: [], dropReason: "missing To_Account" };
     }
 
     const route = findRouteByTimbotUserId(toAccount);
     if (!route) {
-      return { dropReason: `unknown To_Account: ${msg.To_Account}` };
+      return { routes: [], dropReason: `unknown To_Account: ${msg.To_Account}` };
     }
 
-    return { route };
+    return { routes: [route] };
   }
 
-  // 群消息：通过 AtRobots_Account 匹配路由
+  // 群消息：通过 AtRobots_Account 匹配路由，支持多个 bot 同时转发
   if (isGroupMessage(msg)) {
     const atRobots = msg.AtRobots_Account;
     if (!Array.isArray(atRobots) || atRobots.length === 0) {
-      return { dropReason: "missing AtRobots_Account" };
+      return { routes: [], dropReason: "missing AtRobots_Account" };
     }
 
-    // 逐个匹配被@的机器人，找到第一个有路由的
+    const matched: RouteEntry[] = [];
     for (const robotAccount of atRobots) {
       const normalized = normalizeAccountId(robotAccount);
       if (!normalized) continue;
 
       const route = findRouteByTimbotUserId(normalized);
       if (route) {
-        return { route };
+        matched.push(route);
       }
     }
 
-    return { dropReason: `no matching route for AtRobots: ${atRobots.join(", ")}` };
+    if (matched.length === 0) {
+      return { routes: [], dropReason: `no matching route for AtRobots: ${atRobots.join(", ")}` };
+    }
+
+    return { routes: matched };
   }
 
-  return { dropReason: `unsupported CallbackCommand: ${msg.CallbackCommand}` };
+  return { routes: [], dropReason: `unsupported CallbackCommand: ${msg.CallbackCommand}` };
 }
 
 /**
@@ -233,40 +242,43 @@ async function handleWebhook(
   }
 
   const decision = resolveRouteForWebhook(msgObj);
-  if (!decision.route) {
+  if (decision.routes.length === 0) {
     logInfo(`Dropping webhook: SdkAppid=${sdkAppId}, reason=${decision.dropReason || "no matching route"}`);
     return sendOk(res);
   }
 
-  if (!decision.route.enabled) {
-    logWarn(`Route disabled for timbotUserId=${decision.route.timbotUserId}`);
-    return sendOk(res);
-  }
-
-  const queryString = urlObj.search ? urlObj.search.substring(1) : "";
-  const targetUrl = buildTargetUrl(decision.route, queryString);
-
-  const target = msgObj.To_Account
-    ? `To=${msgObj.To_Account}`
-    : `AtRobots=${(msgObj.AtRobots_Account || []).join(",")} Group=${msgObj.GroupId || "?"}`;
-
-  logInfo(
-    `Forwarding: SdkAppid=${sdkAppId} ${target} From=${msgObj.From_Account || "?"} → ${decision.route.backend}`
-  );
-
   // 立即给 IM 回 200 OK，避免后端慢或异常时 IM 重试导致重复消息
   sendOk(res);
 
-  // 异步转发到后端，错误仅记录日志
-  forwardRequest(targetUrl, body, req.headers)
-    .then((result) => {
-      if (result.statusCode >= 400) {
-        logWarn(`Backend returned ${result.statusCode} for ${targetUrl}`);
-      }
-    })
-    .catch((err) => {
-      logError(`Unexpected forward error: ${err.message}`);
-    });
+  const queryString = urlObj.search ? urlObj.search.substring(1) : "";
+
+  // 对每个匹配的路由都异步转发（群消息可能 @了多个 bot）
+  for (const route of decision.routes) {
+    if (!route.enabled) {
+      logWarn(`Route disabled for timbotUserId=${route.timbotUserId}`);
+      continue;
+    }
+
+    const targetUrl = buildTargetUrl(route, queryString);
+
+    const target = msgObj.To_Account
+      ? `To=${msgObj.To_Account}`
+      : `AtBot=${route.timbotUserId} Group=${msgObj.GroupId || "?"}`;
+
+    logInfo(
+      `Forwarding: SdkAppid=${sdkAppId} ${target} From=${msgObj.From_Account || "?"} → ${route.backend}`
+    );
+
+    forwardRequest(targetUrl, body, req.headers)
+      .then((result) => {
+        if (result.statusCode >= 400) {
+          logWarn(`Backend returned ${result.statusCode} for ${targetUrl}`);
+        }
+      })
+      .catch((err) => {
+        logError(`Unexpected forward error: ${err.message}`);
+      });
+  }
 }
 
 /**

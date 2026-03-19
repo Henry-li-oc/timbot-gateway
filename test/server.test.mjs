@@ -65,7 +65,8 @@ describe("Server routing helpers", () => {
       MsgBody: [{ MsgType: "TIMTextElem", MsgContent: { Text: "hello" } }],
     });
 
-    assert.equal(decision.route?.backend, "http://127.0.0.1:18789");
+    assert.equal(decision.routes.length, 1);
+    assert.equal(decision.routes[0].backend, "http://127.0.0.1:18789");
     assert.equal(decision.dropReason, undefined);
   });
 
@@ -78,7 +79,8 @@ describe("Server routing helpers", () => {
       MsgBody: [{ MsgType: "TIMTextElem", MsgContent: { Text: "@bot 帮我看一下" } }],
     });
 
-    assert.equal(decision.route?.timbotUserId, "bot");
+    assert.equal(decision.routes.length, 1);
+    assert.equal(decision.routes[0].timbotUserId, "bot");
     assert.equal(decision.dropReason, undefined);
   });
 
@@ -90,7 +92,7 @@ describe("Server routing helpers", () => {
       MsgBody: [{ MsgType: "TIMTextElem", MsgContent: { Text: "大家好" } }],
     });
 
-    assert.equal(decision.route, undefined);
+    assert.equal(decision.routes.length, 0);
     assert.match(decision.dropReason, /missing AtRobots_Account/);
   });
 
@@ -103,7 +105,7 @@ describe("Server routing helpers", () => {
       MsgBody: [{ MsgType: "TIMTextElem", MsgContent: { Text: "@unknown_bot hello" } }],
     });
 
-    assert.equal(decision.route, undefined);
+    assert.equal(decision.routes.length, 0);
     assert.match(decision.dropReason, /no matching route for AtRobots/);
   });
 
@@ -114,7 +116,7 @@ describe("Server routing helpers", () => {
       To_Account: "bot",
     });
 
-    assert.equal(decision.route, undefined);
+    assert.equal(decision.routes.length, 0);
     assert.match(decision.dropReason, /unsupported CallbackCommand/);
   });
 
@@ -126,11 +128,12 @@ describe("Server routing helpers", () => {
       MsgBody: [{ MsgType: "TIMTextElem", MsgContent: { Text: "hi" } }],
     });
 
-    assert.equal(decision.route?.timbotUserId, "bot");
+    assert.equal(decision.routes.length, 1);
+    assert.equal(decision.routes[0].timbotUserId, "bot");
     assert.equal(decision.dropReason, undefined);
   });
 
-  it("should match first routed bot when multiple bots are @mentioned", () => {
+  it("should return ALL matched bots when multiple bots are @mentioned", () => {
     const decision = resolveRouteForWebhook({
       CallbackCommand: "Bot.OnGroupMessage",
       From_Account: "zhiheng",
@@ -139,8 +142,10 @@ describe("Server routing helpers", () => {
       MsgBody: [{ MsgType: "TIMTextElem", MsgContent: { Text: "@unknown_robot @helper_bot @bot" } }],
     });
 
-    // 第一个匹配到路由的是 helper_bot
-    assert.equal(decision.route?.timbotUserId, "helper_bot");
+    // unknown_robot 无路由，helper_bot 和 bot 都应返回
+    assert.equal(decision.routes.length, 2);
+    assert.equal(decision.routes[0].timbotUserId, "helper_bot");
+    assert.equal(decision.routes[1].timbotUserId, "bot");
     assert.equal(decision.dropReason, undefined);
   });
 
@@ -153,7 +158,7 @@ describe("Server routing helpers", () => {
       MsgBody: [{ MsgType: "TIMTextElem", MsgContent: { Text: "hello" } }],
     });
 
-    assert.equal(decision.route, undefined);
+    assert.equal(decision.routes.length, 0);
     assert.match(decision.dropReason, /missing AtRobots_Account/);
   });
 
@@ -163,7 +168,7 @@ describe("Server routing helpers", () => {
       From_Account: "zhiheng",
     });
 
-    assert.equal(decision.route, undefined);
+    assert.equal(decision.routes.length, 0);
     assert.match(decision.dropReason, /missing To_Account/);
   });
 });
